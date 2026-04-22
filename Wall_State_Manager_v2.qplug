@@ -1,0 +1,172 @@
+-- Wall State Manager v2
+-- Expandable version with configurable wall count via Properties
+
+PluginInfo = {
+  Name = "Wall State Manager v2",
+  Version = "2.0.0",
+  BuildVersion = "2.0.0.0",
+  Id = "dstn.qsys.wall-state-manager-v2",
+  Author = "Dustin Bennett - Telsystems",
+  Description = "Expandable sensor override interface for physical combinable space walls with configurable wall count."
+}
+
+function GetColor() return { 180, 100, 100 } end
+function GetPrettyName() return "Wall State Manager v2" end
+
+function GetProperties()
+  return {
+    {
+      Name = "Number of Walls",
+      Type = "integer",
+      Min = 1,
+      Max = 10,
+      Value = 2
+    }
+  }
+end
+
+function GetControls(props)
+  local controls = {}
+  local wall_count = props["Number of Walls"].Value
+
+  for i = 1, wall_count do
+    -- Inputs from Physical GPIO or Core Logic
+    table.insert(controls, { Name = "Sensor_" .. i .. "_In", ControlType = "Indicator", IndicatorType = "Led", Count = 1, PinStyle = "Input", UserPin = true })
+
+    -- True evaluated outputs distributed to the rest of the system plugins
+    table.insert(controls, { Name = "Wall_" .. i .. "_Out", ControlType = "Indicator", IndicatorType = "Led", Count = 1, PinStyle = "Output", UserPin = true })
+
+    -- Local UI Control
+    table.insert(controls, { Name = "Wall_" .. i .. "_State", ControlType = "Button", ButtonType = "Toggle", Count = 1, PinStyle = "Both", UserPin = true })
+  end
+
+  -- Bypass toggle (single global control)
+  table.insert(controls, { Name = "Bypass_Enable", ControlType = "Button", ButtonType = "Toggle", Count = 1, PinStyle = "Both", UserPin = true })
+
+  return controls
+end
+
+function GetControlLayout(props)
+  local layout = {}
+  local graphics = {}
+  local wall_count = props["Number of Walls"].Value
+  local r = 0
+
+  table.insert(graphics, { Type = "Header", Text = "Wall State Manager v2 (" .. wall_count .. " Walls)", Position = {0, r * 20}, Size = {320, 20} })
+
+  -- Bypass control
+  r = r + 1
+  layout["Bypass_Enable"] = { Style = "Button", Legend = "Enable Manual Override", Color = {200, 30, 30}, Position = {0, r * 20}, Size = {320, 30} }
+  r = r + 2
+
+  -- Wall state toggles
+  table.insert(graphics, { Type = "Header", Text = "Wall States (Manual Override)", Position = {0, r * 20}, Size = {320, 20} })
+  r = r + 1
+  for i = 1, wall_count do
+    local col = ((i - 1) % 4)
+    local row_offset = math.floor((i - 1) / 4)
+    layout["Wall_" .. i .. "_State"] = {
+      Style = "Button",
+      Legend = "Wall " .. i,
+      Position = {col * 80, (r + row_offset) * 20},
+      Size = {78, 30}
+    }
+  end
+  local wall_rows = math.ceil(wall_count / 4)
+  r = r + wall_rows + 1
+
+  -- Sensor inputs
+  table.insert(graphics, { Type = "Header", Text = "Physical Sensor Inputs", Position = {0, r * 20}, Size = {320, 20} })
+  r = r + 1
+  for i = 1, wall_count do
+    local col = ((i - 1) % 4)
+    local row_offset = math.floor((i - 1) / 4)
+    layout["Sensor_" .. i .. "_In"] = {
+      Style = "Indicator",
+      Color = {0, 255, 0},
+      Position = {col * 80, (r + row_offset) * 20},
+      Size = {78, 20}
+    }
+  end
+  r = r + wall_rows + 1
+
+  -- System logic outputs
+  table.insert(graphics, { Type = "Header", Text = "System Logic Outputs", Position = {0, r * 20}, Size = {320, 20} })
+  r = r + 1
+  for i = 1, wall_count do
+    local col = ((i - 1) % 4)
+    local row_offset = math.floor((i - 1) / 4)
+    layout["Wall_" .. i .. "_Out"] = {
+      Style = "Indicator",
+      Color = {0, 150, 255},
+      Position = {col * 80, (r + row_offset) * 20},
+      Size = {78, 20}
+    }
+  end
+
+  return layout, graphics
+end
+
+if Controls then
+  local wall_count = Properties["Number of Walls"].Value
+
+  -- Update all outputs from their corresponding state toggles
+  local function update_outputs()
+    for i = 1, wall_count do
+      Controls["Wall_" .. i .. "_Out"].Boolean = Controls["Wall_" .. i .. "_State"].Boolean
+    end
+  end
+
+  -- Sync all wall states to match physical sensor readings (inverted logic)
+  local function sync_from_sensors()
+    for i = 1, wall_count do
+      Controls["Wall_" .. i .. "_State"].Boolean = not Controls["Sensor_" .. i .. "_In"].Boolean
+    end
+    update_outputs()
+  end
+
+  -- Initialize: bypass off, all toggles disabled, sync from sensors
+  Controls.Bypass_Enable.Boolean = false
+  for i = 1, wall_count do
+    Controls["Wall_" .. i .. "_State"].IsDisabled = true
+  end
+  sync_from_sensors()
+
+  -- Bypass toggle handler
+  Controls.Bypass_Enable.EventHandler = function(ctrl)
+    local bypass = ctrl.Boolean
+
+    -- Enable/disable manual wall state toggles
+    for i = 1, wall_count do
+      Controls["Wall_" .. i .. "_State"].IsDisabled = not bypass
+    end
+
+    -- When bypass is turned OFF, re-sync to physical sensors immediately
+    if not bypass then
+      sync_from_sensors()
+    end
+  end
+
+  -- Sensor input handlers (inverted logic: sensor HIGH = wall closed)
+  for i = 1, wall_count do
+    Controls["Sensor_" .. i .. "_In"].EventHandler = function(ctrl)
+      if not Controls.Bypass_Enable.Boolean then
+        Controls["Wall_" .. i .. "_State"].Boolean = not ctrl.Boolean
+        Controls["Wall_" .. i .. "_Out"].Boolean = not ctrl.Boolean
+      end
+    end
+  end
+
+  -- Manual wall state toggle handlers
+  for i = 1, wall_count do
+    Controls["Wall_" .. i .. "_State"].EventHandler = function(ctrl)
+      if Controls.Bypass_Enable.Boolean then
+        Controls["Wall_" .. i .. "_Out"].Boolean = ctrl.Boolean
+      else
+        -- Safety: revert to sensor reading if bypass is off
+        ctrl.Boolean = not Controls["Sensor_" .. i .. "_In"].Boolean
+      end
+    end
+  end
+
+end
