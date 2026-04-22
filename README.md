@@ -1,95 +1,121 @@
 # Wall State Manager v2
 
-An expandable Q-SYS Plugin providing a sensor override interface for physical combinable space walls with **configurable wall count**.
+**Q-SYS Plugin** — Expandable sensor override interface for physical combinable space walls with configurable wall count.
 
-## What's New vs v1
+| Field | Value |
+|---|---|
+| **Version** | 2.0.1 |
+| **Author** | Dustin Bennett — TEL Systems |
+| **Plugin ID** | `dstn.qsys.wall-state-manager-v2` |
+| **Platform** | Q-SYS Designer |
 
-| Feature | v1 | v2 |
-|---------|----|----|
-| Wall count | Fixed at 2 | Configurable 1–10 via Properties |
-| Controls | Hardcoded `Wall_1`, `Wall_2` | Dynamically generated `Wall_1` through `Wall_N` |
-| Layout | Static 2-column | Auto-arranged grid (4 per row) |
-| Core logic | Identical | Identical (inverted sensor logic, bypass mode) |
-
-> **v1 is preserved untouched** in the [WallStateManager](https://github.com/Sequence32/WallStateManager) repo.
+---
 
 ## Overview
 
-This plugin acts as a gateway between physical wall sensors (GPIO/digital inputs) and the rest of the Q-SYS control system. It evaluates sensor states and provides clean boolean outputs that downstream plugins (UI controllers, camera controllers, video routers) can consume. A manual bypass mode allows operators to override sensor readings for testing or maintenance.
+Wall State Manager v2 provides a centralized interface for monitoring and controlling combinable room divider walls via physical sensor inputs. The wall count is fully configurable through the plugin's **Properties** tab — no code changes required.
 
-## Features
+### Key Features
 
-- **Configurable Wall Count** — Set 1 to 10 walls via the Properties panel
-- **Dynamic Control Generation** — Sensor inputs, state toggles, and outputs are created automatically
-- **Inverted Sensor Logic** — Sensor HIGH = wall closed (output LOW), Sensor LOW = wall open (output HIGH)
-- **Manual Override (Bypass)** — Global toggle enables direct control of all wall states
-- **Auto-Revert** — Disabling bypass immediately re-syncs all states to physical sensor readings
-- **Per-Wall Output Pins** — Clean boolean outputs for each wall distributed to downstream plugins
+- **Configurable wall count** — Set 1 to 50 walls directly in the Properties tab; controls, layout, and pins are generated dynamically
+- **Physical sensor integration** — Accepts GPIO/digital inputs representing physical wall sensor states
+- **Inverted sensor logic** — Sensor HIGH = wall closed, Sensor LOW = wall open (standard contact closure behavior)
+- **Manual bypass mode** — Override sensor readings with manual toggle controls when needed
+- **Automatic re-sync** — Disabling bypass immediately re-syncs all wall states to their physical sensor readings
+- **Per-wall output pins** — Each wall state is output individually for downstream plugin consumption
+
+---
 
 ## Installation
 
-1. Copy `Wall_State_Manager_v2.qplug` to your Q-SYS Designer plugin directory:
+1. Copy `Wall_State_Manager_v2.qplug` into your Q-SYS plugin directory:
    ```
-   %USERPROFILE%\Documents\QSC\Q-Sys Designer\Plugins
+   Documents\QSC\Q-Sys Designer\Plugins\
    ```
-2. Restart Q-SYS Designer
-3. The plugin will appear in the **Schematic Library** under **Scripted Components**
+2. Restart Q-SYS Designer or refresh the plugin list.
+3. Drag **Wall State Manager v2** from the plugin list into your design.
+
+---
 
 ## Configuration
 
 ### Properties
 
 | Property | Type | Range | Default | Description |
-|----------|------|-------|---------|-------------|
-| `Number of Walls` | Integer | 1–10 | 2 | Number of wall sensor channels to create |
+|---|---|---|---|---|
+| **Number of Walls** | Integer | 1–50 | 2 | Number of wall zones to manage. Controls, pins, and layout update automatically. |
 
-> **Note**: Changing this property regenerates all controls. Set it before wiring.
+Set this value in the **Properties** panel after placing the plugin in your design. The plugin dynamically generates all controls, I/O pins, and the UI layout based on this value.
 
-### Controls (Per Wall)
+---
 
-For each wall `i` (1 through N):
+## Controls & Pin Mapping
 
-| Control | Type | Direction | Description |
-|---------|------|-----------|-------------|
-| `Sensor_i_In` | LED Indicator | Input | Physical sensor input for Wall i |
-| `Wall_i_State` | Toggle Button | Both | Local UI state / manual override toggle |
-| `Wall_i_Out` | LED Indicator | Output | Evaluated output for system use |
+For each wall `i` (where `i` = 1 to the configured wall count):
 
-### Global Controls
+| Control | Type | Pin Style | Description |
+|---|---|---|---|
+| `Sensor_i_In` | LED Indicator | Input | Physical sensor reading for wall `i` |
+| `Wall_i_State` | Toggle Button | Both | Current evaluated state of wall `i` (manual or sensor-driven) |
+| `Wall_i_Out` | LED Indicator | Output | Final wall state output for downstream consumption |
+| `Bypass_Enable` | Toggle Button | Both | Global manual override toggle |
 
-| Control | Type | Direction | Description |
-|---------|------|-----------|-------------|
-| `Bypass_Enable` | Toggle Button | Both | Enable/disable manual override for all walls |
+### Pin Wiring
 
-### Wiring
+- **`Sensor_i_In`** — Connect to GPIO or Core digital input representing the physical wall sensor
+- **`Wall_i_Out`** — Route to downstream plugins (e.g., Room Combiner, PTZ Camera Controller, Touch Panel UI)
 
-1. Connect physical wall sensor GPIO pins to `Sensor_1_In` through `Sensor_N_In`
-2. Wire `Wall_1_Out` through `Wall_N_Out` to all downstream plugins:
-   - PTZ Camera Controller
-   - Video Router
-   - UI Controller
-   - ACPR Manager
-   - Room State Manager
+---
 
-### Logic
+## Operating Modes
 
-| Mode | Behavior |
-|------|----------|
-| **Normal** (Bypass off) | Outputs follow sensor inputs with inverted logic. Toggles are greyed out. |
-| **Bypass** (Bypass on) | Manual toggles directly control outputs. Sensors are ignored. |
-| **Bypass → Off** | All states immediately re-sync to current sensor readings. |
+### Normal Mode (Bypass OFF)
 
-## Migration from v1
+- Wall state toggles are **disabled** (read-only)
+- Wall states automatically track their corresponding physical sensor inputs
+- Sensor changes are reflected immediately on both the state toggle and the output pin
+- **Inverted logic**: Sensor HIGH → Wall Closed (`false`), Sensor LOW → Wall Open (`true`)
 
-If upgrading from v1:
-1. Set `Number of Walls` to `2` in Properties (matches v1 behavior exactly)
-2. Re-wire `Sensor_1_In`, `Sensor_2_In`, `Wall_1_Out`, `Wall_2_Out` — pin names are identical
-3. The `Bypass_Enable` control works identically
+### Bypass Mode (Bypass ON)
 
-## Author
+- Wall state toggles become **enabled** for manual control
+- Sensor input changes are ignored while bypass is active
+- Each wall can be independently toggled open or closed
+- Output pins reflect the manual toggle state
 
-**Dustin Bennett** — TEL Systems
+### Transition Behavior
 
-## Version
+- **Bypass ON → OFF**: All wall states immediately re-sync to their physical sensor readings
+- **Bypass OFF → ON**: Wall states freeze at their current sensor-driven values; manual override becomes available
 
-v2.0.0
+---
+
+## UI Layout
+
+The plugin renders a compact control panel organized in a 4-column grid:
+
+1. **Header** — Displays plugin name and configured wall count
+2. **Bypass Enable** — Full-width red toggle button for manual override
+3. **Wall States** — Toggle buttons for each wall (4 per row)
+4. **Sensor Inputs** — Green LED indicators showing raw sensor readings
+5. **System Outputs** — Blue LED indicators showing final evaluated outputs
+
+---
+
+## Changelog
+
+### v2.0.1
+- Increased maximum wall count from 10 to **50**
+- Version bump
+
+### v2.0.0
+- Initial v2 release
+- Fully dynamic wall count via Properties (replaces hardcoded wall definitions)
+- Dynamic control generation, pin mapping, and UI layout
+- Bypass/manual override system with automatic re-sync
+
+---
+
+## License
+
+Proprietary — TEL Systems. Internal use only.
