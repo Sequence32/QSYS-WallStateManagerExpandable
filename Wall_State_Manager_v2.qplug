@@ -6,7 +6,7 @@ PluginInfo = {
   Version = "2.0.1",
   BuildVersion = "2.0.0.0",
   Id = "dstn.qsys.wall-state-manager-v2",
-  Author = "Dustin Bennett - Telsystems",
+  Author = "Dustin Bennett",
   Description = "Expandable sensor override interface for physical combinable space walls with configurable wall count."
 }
 
