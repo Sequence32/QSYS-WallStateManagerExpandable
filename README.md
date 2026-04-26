@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | **Version** | 2.0.1 |
-| **Author** | Dustin Bennett — TEL Systems |
+| **Author** | Dustin Bennett |
 | **Plugin ID** | `dstn.qsys.wall-state-manager-v2` |
 | **Platform** | Q-SYS Designer |
 
@@ -116,6 +116,3 @@ The plugin renders a compact control panel organized in a 4-column grid:
 
 ---
 
-## License
-
-Proprietary — TEL Systems. Internal use only.
