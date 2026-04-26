@@ -106,7 +106,6 @@ The plugin renders a compact control panel organized in a 4-column grid:
 
 ### v2.0.1
 - Increased maximum wall count from 10 to **50**
-- Version bump
 
 ### v2.0.0
 - Initial v2 release
